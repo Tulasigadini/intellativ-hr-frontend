@@ -474,7 +474,7 @@ export default function EmployeeDetailPage() {
 
   const downloadDoc = (doc) => {
     const token = localStorage.getItem('access_token');
-    fetch(`http://localhost:8000/api/v1/employees/${id}/documents/${doc.id}/download`, {
+    fetch(`https://intellativ-hr-frontend.onrender.com/api/v1/employees/${id}/documents/${doc.id}/download`, {
       headers: { Authorization: `Bearer ${token}` }
     }).then(r => r.blob()).then(blob => {
       const url = URL.createObjectURL(blob);
@@ -965,7 +965,7 @@ function DocViewer({ doc, employeeId }) {
     const token = localStorage.getItem('access_token');
     const ext = doc.document_name.split('.').pop().toLowerCase();
     setType(ext);
-    fetch(`http://localhost:8000/api/v1/employees/${employeeId}/documents/${doc.id}/download`, {
+    fetch(`https://intellativ-hr-frontend.onrender.com/api/v1/employees/${employeeId}/documents/${doc.id}/download`, {
       headers: { Authorization: `Bearer ${token}` }
     }).then(r => r.blob()).then(blob => {
       setUrl(URL.createObjectURL(blob));

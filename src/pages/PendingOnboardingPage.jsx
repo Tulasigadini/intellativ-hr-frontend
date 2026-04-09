@@ -220,7 +220,7 @@ function DocViewer({ doc, employeeId }) {
   React.useEffect(() => {
     let objectUrl = null;
     const token = localStorage.getItem('access_token');
-    fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8000/api/v1'}/employees/${employeeId}/documents/${doc.id}/download`, {
+    fetch(`${process.env.REACT_APP_API_URL || 'https://intellativ-hr-frontend.onrender.com/api/v1'}/employees/${employeeId}/documents/${doc.id}/download`, {
       headers: { Authorization: `Bearer ${token}` }
     }).then(r => r.blob()).then(blob => { objectUrl = URL.createObjectURL(blob); setUrl(objectUrl); }).catch(() => {});
     return () => { if (objectUrl) URL.revokeObjectURL(objectUrl); };

@@ -91,7 +91,7 @@ export default function LoginPage() {
               <input
                 className="form-control"
                 type="text"
-                placeholder="admin@intellativ.com"
+                placeholder=""
                 value={form.username}
                 onChange={(e) => setForm({ ...form, username: e.target.value })}
                 required
@@ -124,7 +124,7 @@ export default function LoginPage() {
 
           <p style={{ marginTop: 24, textAlign: 'center', fontSize: 13, color: 'var(--text-muted)' }}>
             Default: <code style={{ background: 'var(--bg)', padding: '2px 6px', borderRadius: 4 }}>
-              admin@intellativ.com / Admin@123
+              superadmin / Admin@1234
             </code>
           </p>
         </div>

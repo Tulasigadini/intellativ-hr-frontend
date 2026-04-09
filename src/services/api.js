@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const API = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || 'https://intellativ-hr-frontend.onrender.com/api/v1',
+  baseURL: process.env.REACT_APP_API_URL || 'https://intellative-hr-backend.onrender.com/api/v1',
   timeout: 30000,
 });
 

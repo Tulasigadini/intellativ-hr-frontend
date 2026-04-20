@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const API = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || 'https://intellative-hr-backend.onrender.com/api/v1',
+  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:8000/api/v1',
   timeout: 30000,
 });
 
@@ -40,6 +40,9 @@ export const authAPI = {
   me: () => API.get('/auth/me'),
   changePassword: (old_password, new_password) => API.post('/auth/change-password', { old_password, new_password }),
   adminChangePassword: (employeeId, new_password) => API.post(`/auth/admin/change-password/${employeeId}`, { new_password }),
+  forgotPassword: (username) => API.post('/auth/forgot-password', { username }),
+  resetPassword: (token, new_password) => API.post('/auth/reset-password', { token, new_password }),
+  verifyResetToken: (token) => API.get(`/auth/verify-reset-token/${token}`),
 };
 
 export const dashboardAPI = {
@@ -82,6 +85,29 @@ export const employeesAPI = {
     fd.append('file', file);
     return API.post(`/employees/${id}/profile-picture`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
   },
+  getBankDetails: (id) => API.get(`/employees/${id}/bank-details`),
+  saveBankDetails: (id, data) => API.post(`/employees/${id}/bank-details`, data),
+  verifyBankDetails: (id) => API.put(`/employees/${id}/bank-details/verify`),
+  updateProfile: (id, data) => API.put(`/employees/${id}`, data),
+  parseResume: (id, file) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    return API.post(`/parsing/${id}/parse-resume`, fd, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 90000 });
+  },
+  parseForm16: (id, file) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    return API.post(`/parsing/${id}/parse-form16`, fd, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 90000 });
+  },
+  publicExtract: (file, source = 'resume') => {
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('source', source);
+    return API.post('/parsing/public/extract-data', fd, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 90000 });
+  },
+  getSalaryDetails: (id) => API.get(`/employees/${id}/salary`),
+  saveSalaryDetails: (id, data) => API.post(`/employees/${id}/salary`, data),
+  createProfileTask: (id) => API.post(`/employees/${id}/create-profile-task`),
 };
 
 export const iamAPI = {

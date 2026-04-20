@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { departmentsAPI } from '../services/api';
 import { useAsync } from '../hooks/useAsync';
 import LoadingButton from '../components/ui/LoadingButton';
+import { ConfirmDialog } from '../components/layout/Layout';
 import { toast } from 'react-toastify';
 
 export default function DepartmentsPage() {
@@ -9,6 +10,7 @@ export default function DepartmentsPage() {
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(null); // null | 'create' | dept object
   const [form, setForm] = useState({ name: '', code: '', description: '' });
+  const [deleteTarget, setDeleteTarget] = useState(null);
   const { run, loading: saving } = useAsync();
 
   const load = () => {
@@ -27,7 +29,7 @@ export default function DepartmentsPage() {
   };
 
   const openEdit = (dept) => {
-    setForm({ name: dept.name, code: dept.code, description: dept.description || '' });
+    setForm({ name: dept.name || '', code: dept.code || '', description: dept.description || '' });
     setModal(dept);
   };
 
@@ -46,20 +48,20 @@ export default function DepartmentsPage() {
     }
   });
 
-  const del = async (id) => {
-    if (!window.confirm('Delete this department?')) return;
+  const confirmDelete = async () => {
     try {
-      await departmentsAPI.delete(id);
-      toast.success('Deleted');
+      await departmentsAPI.delete(deleteTarget.id);
+      toast.success('Department deleted');
       load();
     } catch { toast.error('Cannot delete — has linked employees or roles'); }
+    finally { setDeleteTarget(null); }
   };
 
   const ICONS = { IT: '💻', HR: '👥', FIN: '💰', SAL: '📈', MKT: '📣', OPS: '⚙️', ADM: '🏛' };
 
   return (
     <>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
+      <div className="page-header">
         <div>
           <h1 className="page-title">Departments</h1>
           <p className="page-subtitle">Manage organizational departments</p>
@@ -70,33 +72,27 @@ export default function DepartmentsPage() {
       {loading ? (
         <div className="loading-overlay"><div className="spinner" /></div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px,1fr))', gap: 16 }}>
+        <div className="dept-grid">
           {departments.map(dept => (
-            <div key={dept.id} className="card" style={{ padding: 0, overflow: 'hidden' }}>
-              <div style={{
-                background: `linear-gradient(135deg, var(--primary), var(--primary-light))`,
-                padding: '20px 24px 16px',
-                color: '#fff',
-              }}>
-                <div style={{ fontSize: 32, marginBottom: 8 }}>
-                  {ICONS[dept.code] || '🏢'}
-                </div>
+            <div key={dept.id} className="card dept-card">
+              <div className="dept-card-header">
+                <div style={{ fontSize: 32, marginBottom: 8 }}>{ICONS[dept.code] || '🏢'}</div>
                 <div style={{ fontWeight: 800, fontSize: 16 }}>{dept.name}</div>
                 <div style={{ fontSize: 12, opacity: 0.75, marginTop: 2 }}>Code: {dept.code}</div>
               </div>
-              <div style={{ padding: '16px 24px' }}>
+              <div className="dept-card-body">
                 {dept.description && (
                   <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 14, lineHeight: 1.5 }}>
                     {dept.description}
                   </p>
                 )}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
                   <span className={`badge ${dept.is_active ? 'badge-active' : 'badge-inactive'}`}>
-                    {dept.is_active ? 'Active' : 'Inactive'}
+                    {dept.is_active ? '● Active' : '● Inactive'}
                   </span>
                   <div style={{ display: 'flex', gap: 8 }}>
                     <button className="btn btn-ghost btn-sm" onClick={() => openEdit(dept)}>✏️ Edit</button>
-                    <button className="btn btn-ghost btn-sm" style={{ color: 'var(--danger)' }} onClick={() => del(dept.id)}>🗑</button>
+                    <button className="btn btn-ghost btn-sm" style={{ color: 'var(--danger)' }} onClick={() => setDeleteTarget(dept)}>🗑</button>
                   </div>
                 </div>
               </div>
@@ -112,36 +108,82 @@ export default function DepartmentsPage() {
         </div>
       )}
 
-      {/* Modal */}
+      {/* Create / Edit Modal */}
       {modal && (
         <div className="modal-overlay" onClick={() => setModal(null)}>
           <div className="modal" style={{ maxWidth: 480 }} onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <span className="modal-title">{modal === 'create' ? 'Add Department' : 'Edit Department'}</span>
+              <span className="modal-title">{modal === 'create' ? '➕ Add Department' : `✏️ Edit — ${modal.name}`}</span>
               <button className="btn btn-ghost btn-icon btn-sm" onClick={() => setModal(null)}>✕</button>
             </div>
             <div className="modal-body">
               <div className="form-group">
                 <label className="form-label required">Name</label>
-                <input className="form-control" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
+                <input
+                  className="form-control"
+                  value={form.name}
+                  onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                  placeholder="e.g. Information Technology"
+                  autoFocus
+                />
               </div>
-              {modal === 'create' && (
+              {modal === 'create' ? (
                 <div className="form-group">
                   <label className="form-label required">Code</label>
-                  <input className="form-control" value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value.toUpperCase() }))} placeholder="e.g. IT, HR, FIN" />
+                  <input
+                    className="form-control"
+                    value={form.code}
+                    onChange={e => setForm(f => ({ ...f, code: e.target.value.toUpperCase() }))}
+                    placeholder="e.g. IT, HR, FIN"
+                    maxLength={10}
+                  />
+                  <div className="form-hint">Short uppercase code (cannot be changed later)</div>
+                </div>
+              ) : (
+                <div className="form-group">
+                  <label className="form-label">Code</label>
+                  <input className="form-control" value={form.code} disabled />
+                  <div className="form-hint">Code cannot be changed after creation</div>
                 </div>
               )}
               <div className="form-group">
                 <label className="form-label">Description</label>
-                <textarea className="form-control" rows={3} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
+                <textarea
+                  className="form-control"
+                  rows={3}
+                  value={form.description}
+                  onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+                  placeholder="Brief description of this department..."
+                />
               </div>
             </div>
             <div className="modal-footer">
               <button className="btn btn-ghost" onClick={() => setModal(null)}>Cancel</button>
-              <LoadingButton className="btn btn-primary" loading={saving} loadingText="Saving…" onClick={save} disabled={!form.name || (modal === 'create' && !form.code)}>Save</LoadingButton>
+              <LoadingButton
+                className="btn btn-primary"
+                loading={saving}
+                loadingText="Saving…"
+                onClick={save}
+                disabled={!form.name || (modal === 'create' && !form.code)}
+              >
+                {modal === 'create' ? 'Create Department' : 'Save Changes'}
+              </LoadingButton>
             </div>
           </div>
         </div>
+      )}
+
+      {/* Delete Confirmation */}
+      {deleteTarget && (
+        <ConfirmDialog
+          title="🗑 Delete Department"
+          message={`Are you sure you want to delete "${deleteTarget.name}"? This action cannot be undone.`}
+          confirmLabel="Yes, Delete"
+          cancelLabel="Cancel"
+          onConfirm={confirmDelete}
+          onCancel={() => setDeleteTarget(null)}
+          variant="danger"
+        />
       )}
     </>
   );

@@ -5,6 +5,7 @@ import { useButtonLoading } from '../hooks/useAsync';
 import { useNotifications } from '../hooks/useNotifications';
 import LoadingButton from '../components/ui/LoadingButton';
 import { toast } from 'react-toastify';
+import { ConfirmDialog } from '../components/layout/Layout';
 
 const STATUSES = ['pending', 'in_progress', 'completed', 'cancelled'];
 const PRIORITIES = ['low', 'medium', 'high', 'urgent'];
@@ -153,12 +154,23 @@ const TaskCard = ({ task, user, isHR, btnLoading, onEdit, onView, onClaim, onUnc
           <span style={{ fontSize: 24, lineHeight: 1, flexShrink: 0, marginTop: 2 }}>
             {TYPE_META[task.task_type]?.icon || '📋'}
           </span>
-          <div style={{ minWidth: 0 }}>
-            <div style={{ fontWeight: 700, fontSize: 14, color: '#111827', lineHeight: 1.4, wordBreak: 'break-word' }}>
-              {task.title}
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
+              <div style={{ fontWeight: 700, fontSize: 15, color: '#111827', lineHeight: 1.4, wordBreak: 'break-word' }}>
+                {task.title}
+              </div>
+              {task.related_employee_name && (
+                <span style={{ 
+                  padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700, 
+                  background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca',
+                  display: 'inline-flex', alignItems: 'center', gap: 4
+                }}>
+                  🎯 Target: {task.related_employee_name}
+                </span>
+              )}
             </div>
             {task.description && (
-              <p style={{ fontSize: 12, color: '#6b7280', margin: '4px 0 0', lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+              <p style={{ fontSize: 12, color: '#6b7280', margin: 0, lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                 {task.description}
               </p>
             )}
@@ -309,6 +321,7 @@ export default function TasksPage() {
   const [statsLoaded, setStatsLoaded] = useState(false);
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [deleteTaskTarget, setDeleteTaskTarget] = useState(null);
   const [activeTab, setActiveTab] = useState('my'); // 'my' | 'team' | 'all'
   const [filterStatus, setFilterStatus] = useState('');
   const [filterType, setFilterType] = useState('');
@@ -432,14 +445,22 @@ export default function TasksPage() {
     refreshNotifs();
   });
 
-  const del = async (id) => {
-    if (!window.confirm('Delete this task? This cannot be undone.')) return;
+  const del = (id) => {
+    setDeleteTaskTarget(id);
+  };
+
+  const confirmDelete = async () => {
     try {
-      await tasksAPI.delete(id);
+      await tasksAPI.delete(deleteTaskTarget);
       toast.success('Task deleted');
       load();
       loadStats();
-    } catch { toast.error('Failed to delete task'); }
+      refreshNotifs();
+    } catch {
+      toast.error('Failed to delete task');
+    } finally {
+      setDeleteTaskTarget(null);
+    }
   };
 
   /* ── Tabs ── */
@@ -749,6 +770,18 @@ export default function TasksPage() {
             </div>
           </div>
         </Modal>
+      )}
+
+      {/* ════ Delete Confirm Dialog ════ */}
+      {deleteTaskTarget && (
+        <ConfirmDialog
+          title="Delete Task"
+          message="Are you sure you want to delete this task? This action cannot be undone."
+          confirmLabel="Delete"
+          variant="danger"
+          onConfirm={confirmDelete}
+          onCancel={() => setDeleteTaskTarget(null)}
+        />
       )}
 
       {/* ════ View Task Modal ════ */}

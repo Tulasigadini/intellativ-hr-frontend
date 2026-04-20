@@ -469,13 +469,16 @@ tbody td { padding: 14px 16px; font-size: 14px; vertical-align: middle; }
 }
 .step-circle.active { border-color: var(--primary); background: var(--primary); color: #fff; }
 .step-circle.done { border-color: var(--success); background: var(--success); color: #fff; }
+.step-circle.skipped { border-color: var(--text-muted); background: var(--bg); color: var(--text-muted); border-style: dashed; }
 
 .step-line { flex: 1; height: 2px; background: var(--border); margin: 0 8px; transition: background 0.3s; }
 .step-line.done { background: var(--success); }
+.step-line.skipped { background: var(--border); border-top: 2px dashed var(--text-muted); height: 0; }
 
 .step-label { font-size: 11px; font-weight: 600; color: var(--text-muted); margin-top: 6px; text-align: center; }
 .step-label.active { color: var(--primary); }
 .step-label.done { color: var(--success); }
+.step-label.skipped { color: var(--text-muted); opacity: 0.7; }
 
 .step-wrap { display: flex; flex-direction: column; align-items: center; }
 
@@ -763,4 +766,242 @@ tbody td { padding: 14px 16px; font-size: 14px; vertical-align: middle; }
   cursor: not-allowed;
   transform: none !important;
   box-shadow: none !important;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   ENHANCED RESPONSIVE DESIGN & UX IMPROVEMENTS
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ── Confirm Dialog ──────────────────────────────────────────────── */
+.confirm-dialog {
+  max-width: 420px !important;
+}
+
+/* ── Mobile Overlay ──────────────────────────────────────────────── */
+.mobile-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 99;
+  animation: fadeIn 0.2s ease;
+}
+
+/* ── Nav Label ───────────────────────────────────────────────────── */
+.nav-label {
+  transition: opacity 0.2s, width 0.2s;
+}
+.sidebar.collapsed .nav-label {
+  opacity: 0;
+  width: 0;
+  overflow: hidden;
+}
+.sidebar.collapsed .nav-badge {
+  opacity: 0;
+  width: 0;
+  overflow: hidden;
+}
+
+/* ── Logout Button ───────────────────────────────────────────────── */
+.logout-btn {
+  width: 100%;
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.6);
+  cursor: pointer;
+  text-align: left;
+}
+.logout-btn:hover {
+  background: rgba(220,38,38,0.2) !important;
+  color: #fca5a5 !important;
+}
+
+/* ── User Chip ───────────────────────────────────────────────────── */
+.user-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: var(--accent-pale);
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.user-chip:hover { background: var(--border); }
+.user-chip-text { display: block; }
+
+/* ── Page Header ─────────────────────────────────────────────────── */
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 24px;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+/* ── Department Grid ─────────────────────────────────────────────── */
+.dept-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+}
+.dept-card { padding: 0; overflow: hidden; }
+.dept-card-header {
+  background: linear-gradient(135deg, var(--primary), var(--primary-light));
+  padding: 20px 24px 16px;
+  color: #fff;
+}
+.dept-card-body { padding: 16px 24px; }
+
+/* ── Responsive: Laptop (≤1280px) ────────────────────────────────── */
+@media (max-width: 1280px) {
+  .page-content { padding: 24px 20px; }
+}
+
+/* ── Responsive: Tablet (≤1024px) ────────────────────────────────── */
+@media (max-width: 1024px) {
+  :root { --sidebar-width: 220px; }
+  .form-row-3 { grid-template-columns: 1fr 1fr; }
+  .stat-grid { grid-template-columns: repeat(2, 1fr); }
+  
+  /* Profile grid to single column on tablet */
+  .profile-grid-2 { grid-template-columns: 1fr !important; }
+}
+
+/* ── Responsive: Mobile (≤768px) ─────────────────────────────────── */
+@media (max-width: 768px) {
+  /* Login page */
+  .login-page { grid-template-columns: 1fr; }
+  .login-left { display: none; }
+
+  /* Sidebar: hidden by default on mobile, shown via mobile-open */
+  .sidebar {
+    transform: translateX(-100%);
+    width: var(--sidebar-width) !important;
+    transition: transform 0.3s ease, width 0.3s ease;
+    z-index: 200;
+  }
+  .sidebar.collapsed {
+    width: var(--sidebar-width) !important;
+    transform: translateX(-100%);
+  }
+  .sidebar.mobile-open {
+    transform: translateX(0) !important;
+  }
+  .sidebar.mobile-open .nav-label,
+  .sidebar.mobile-open .nav-badge {
+    opacity: 1 !important;
+    width: auto !important;
+    overflow: visible !important;
+  }
+  .mobile-overlay { display: block; }
+
+  /* Main content full width */
+  .main-content { margin-left: 0 !important; }
+  .main-content.collapsed { margin-left: 0 !important; }
+
+  /* Forms */
+  .form-row, .form-row-3 { grid-template-columns: 1fr; }
+
+  /* Stats */
+  .stat-grid { grid-template-columns: 1fr 1fr; }
+
+  /* Spacing */
+  .page-content { padding: 16px 14px; }
+  .topbar { padding: 0 14px; }
+
+  /* Tabs — scrollable */
+  .tabs { overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; padding-bottom: 2px; }
+  .tab { white-space: nowrap; flex-shrink: 0; padding: 10px 14px; font-size: 13px; }
+
+  /* Cards */
+  .card { padding: 16px; }
+  .modal { max-height: 95vh; }
+  .modal-body { padding: 16px; }
+  .modal-header, .modal-footer { padding: 14px 16px; }
+
+  /* Profile header */
+  .profile-header { flex-direction: column; align-items: flex-start; padding: 20px 16px; gap: 12px; }
+  .profile-header > div:last-child { width: 100%; text-align: left; }
+
+  /* Tables — scroll on mobile */
+  .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  table { min-width: 600px; }
+
+  /* Page header */
+  .page-header { align-items: stretch; }
+  .page-header .btn { width: 100%; justify-content: center; }
+
+  /* Dept grid */
+  .dept-grid { grid-template-columns: 1fr; }
+
+  /* User chip — hide text on very small */
+  .user-chip-text { display: none; }
+}
+
+/* ── Responsive: Small mobile (≤480px) ───────────────────────────── */
+@media (max-width: 480px) {
+  .stat-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .stat-value { font-size: 22px; }
+  .filter-bar { flex-direction: column; align-items: stretch; }
+  .filter-bar .form-control { width: 100% !important; }
+  .page-title { font-size: 18px; }
+  .pagination { flex-wrap: wrap; justify-content: center; }
+
+  /* Narrower modals on small screen */
+  .modal-overlay { padding: 10px; }
+}
+
+/* ── Flags / Status Indicators ────────────────────────────────────── */
+.flag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 20px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+.flag-success { background: var(--success-bg); color: var(--success); border: 1px solid #86efac; }
+.flag-warning { background: var(--warning-bg); color: var(--warning); border: 1px solid #fcd34d; }
+.flag-danger  { background: var(--danger-bg);  color: var(--danger);  border: 1px solid #fca5a5; }
+.flag-info    { background: var(--info-bg);    color: var(--info);    border: 1px solid #7dd3fc; }
+.flag-muted   { background: var(--bg);         color: var(--text-muted); border: 1px solid var(--border); }
+
+/* ── Better table responsiveness on medium screens ────────────────── */
+@media (max-width: 900px) {
+  /* Stack certain multi-column layouts */
+  .two-col-layout { grid-template-columns: 1fr !important; }
+}
+
+/* ── Improved modal on mobile ─────────────────────────────────────── */
+@media (max-width: 600px) {
+  .modal { border-radius: var(--radius); }
+  .modal-footer { flex-direction: column-reverse; }
+  .modal-footer .btn { width: 100%; justify-content: center; }
+}
+
+/* ── Topbar improvements ─────────────────────────────────────────── */
+.topbar-brand {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--primary);
+  display: none;
+}
+@media (max-width: 768px) {
+  .topbar-brand { display: block; }
+}
+
+/* ── Focus visible improvements ──────────────────────────────────── */
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ── Print styles ────────────────────────────────────────────────── */
+@media print {
+  .sidebar, .topbar, .btn { display: none !important; }
+  .main-content { margin-left: 0 !important; }
 }

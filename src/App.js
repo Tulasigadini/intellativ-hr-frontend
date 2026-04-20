@@ -40,6 +40,7 @@ function AppRoutes() {
     <NotificationProvider user={user}>
     <Routes>
       <Route path="/login" element={user ? <Navigate to="/dashboard" /> : <LoginPage />} />
+      <Route path="/reset-password" element={<LoginPage />} />
       <Route path="/dashboard" element={<PrivateRoute><DashboardPage /></PrivateRoute>} />
       <Route path="/onboarding" element={<PrivateRoute><OnboardingPage /></PrivateRoute>} />
       <Route path="/employees" element={<PrivateRoute><EmployeesPage /></PrivateRoute>} />

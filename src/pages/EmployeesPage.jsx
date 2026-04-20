@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { employeesAPI, departmentsAPI } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import { toast } from 'react-toastify';
+import { ConfirmDialog } from '../components/layout/Layout';
 
 const STATUS_OPTIONS = ['active','pending','inactive','relieved','suspended'];
 
@@ -24,6 +25,7 @@ export default function EmployeesPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [deptId, setDeptId] = useState('');
   const [departments, setDepartments] = useState([]);
+  const [activateTarget, setActivateTarget] = useState(null);
 
   useEffect(() => {
     departmentsAPI.list().then(r => setDepartments(r.data)).catch(() => {});
@@ -49,16 +51,19 @@ export default function EmployeesPage() {
 
   const statusBadge = (s) => {
     const map = {
-      active: 'badge-active', pending: 'badge-pending',
-      relieved: 'badge-relieved', inactive: 'badge-inactive',
-      suspended: 'badge-pending',
+      active:    { cls: 'flag-success',  label: 'Active' },
+      pending:   { cls: 'flag-warning',  label: 'Pending' },
+      relieved:  { cls: 'flag-danger', label: 'Relieved' },
+      inactive:  { cls: 'flag-muted', label: 'Inactive' },
+      suspended: { cls: 'flag-danger', label: 'Suspended' },
     };
-    return <span className={`badge ${map[s] || 'badge-inactive'}`}>{s}</span>;
+    const m = map[s] || { cls: 'flag-muted', icon: '○', label: s };
+    return <span className={`flag ${m.cls}`}>{m.icon} {m.label}</span>;
   };
 
   return (
     <>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24 }}>
+      <div className="page-header">
         <div>
           <h1 className="page-title">Employees</h1>
           <p className="page-subtitle">{total} total employees</p>
@@ -171,13 +176,7 @@ export default function EmployeesPage() {
                           {canOnboard && emp.status === 'pending' && (
                             <button
                               className="btn btn-accent btn-sm"
-                              onClick={async () => {
-                                try {
-                                  await employeesAPI.activate(emp.id);
-                                  toast.success('Activated!');
-                                  load();
-                                } catch { toast.error('Failed'); }
-                              }}
+                              onClick={() => setActivateTarget(emp)}
                             >
                               🚀 Activate
                             </button>
@@ -206,6 +205,24 @@ export default function EmployeesPage() {
           </div>
         )}
       </div>
+      {activateTarget && (
+        <ConfirmDialog
+          title="🚀 Activate Employee"
+          message={`Activate ${activateTarget.first_name} ${activateTarget.last_name}? This grants them full system access.`}
+          confirmLabel="Yes, Activate"
+          cancelLabel="Cancel"
+          onConfirm={async () => {
+            try {
+              await employeesAPI.activate(activateTarget.id);
+              toast.success('Employee activated!');
+              load();
+            } catch { toast.error('Activation failed'); }
+            finally { setActivateTarget(null); }
+          }}
+          onCancel={() => setActivateTarget(null)}
+          variant="primary"
+        />
+      )}
     </>
   );
 }

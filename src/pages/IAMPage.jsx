@@ -4,6 +4,9 @@ import { useButtonLoading } from '../hooks/useAsync';
 import LoadingButton from '../components/ui/LoadingButton';
 import { useAuth } from '../hooks/useAuth';
 import { toast } from 'react-toastify';
+const EyeIcon = <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>;
+const EyeOffIcon = <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>;
+import { ConfirmDialog } from '../components/layout/Layout';
 
 const ACCESS_LEVEL_COLORS = {
   read: 'badge-new', write: 'badge-pending',
@@ -37,11 +40,13 @@ export default function IAMPage() {
   const [loading, setLoading] = useState(true);
   const [resetModal, setResetModal] = useState(null);
   const [newPassword, setNewPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
   const [saModal, setSaModal] = useState(false);
   const [saForm, setSaForm] = useState({ role_id: '', system_name: '', access_level: 'read' });
   const [assetModal, setAssetModal] = useState(null);
   const [selectedAssets, setSelectedAssets] = useState([]);
   const [filterRole, setFilterRole] = useState('');
+  const [saDeleteTarget, setSaDeleteTarget] = useState(null);
 
   useEffect(() => {
     setLoading(true);
@@ -160,7 +165,7 @@ export default function IAMPage() {
               <div className="card-header"><span className="card-title">User Accounts ({accounts.length})</span></div>
               <div className="table-wrap">
                 <table>
-                  <thead><tr><th>User</th><th>Department</th><th>Role</th><th>Last Login</th><th>Status</th><th>Actions</th></tr></thead>
+                  <thead><tr><th>User</th><th>Department</th><th>Role</th><th>Last Login</th><th>Status</th><th style={{ textAlign: "center" }}>Actions</th></tr></thead>
                   <tbody>
                     {accounts.map(acc => (
                       <tr key={acc.id}>
@@ -183,7 +188,7 @@ export default function IAMPage() {
                               {acc.is_active ? '🔒 Block Login' : '🔓 Allow Login'}
                             </button>
                             {isManage && (
-                              <button className="btn btn-ghost btn-sm" onClick={() => { setResetModal(acc.id); setNewPassword(''); }}>🔑 Reset</button>
+                              <button className="btn btn-ghost btn-sm" onClick={() => { setResetModal(acc.id); setNewPassword(''); setShowNewPassword(false); }}>🔑 Reset</button>
                             )}
                           </div>
                         </td>
@@ -206,7 +211,7 @@ export default function IAMPage() {
                     {roles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                   </select>
                 </div>
-                {isManage && <button className="btn btn-primary btn-sm" onClick={() => setSaModal(true)}>+ Add Rule</button>}
+                {isManage && <button className="btn btn-primary btn-sm" onClick={() => { setSaForm({ role_id: '', system_name: '', access_level: 'read' }); setSaModal(true); }}>+ Add Rule</button>}
               </div>
               <div className="table-wrap">
                 <table>
@@ -218,7 +223,7 @@ export default function IAMPage() {
                         <td><span style={{ fontSize: 14 }}>💻 {sa.system_name}</span></td>
                         <td><span className={`badge ${ACCESS_LEVEL_COLORS[sa.access_level] || 'badge-new'}`}>{sa.access_level}</span></td>
                         <td><span className={`badge ${sa.is_active ? 'badge-active' : 'badge-inactive'}`}>{sa.is_active ? 'Active' : 'Inactive'}</span></td>
-                        {isManage && <td><button className="btn btn-ghost btn-sm" style={{ color: 'var(--danger)' }} onClick={() => iamAPI.deleteSystemAccess(sa.id).then(() => { toast.success('Deleted'); loadSystemAccesses(filterRole); })}>🗑</button></td>}
+                        {isManage && <td><button className="btn btn-ghost btn-sm" style={{ color: 'var(--danger)' }} onClick={() => setSaDeleteTarget(sa)}>🗑 Remove</button></td>}
                       </tr>
                     ))}
                     {systemAccesses.length === 0 && (
@@ -375,7 +380,10 @@ export default function IAMPage() {
             <div className="modal-body">
               <div className="form-group">
                 <label className="form-label required">New Password</label>
-                <input type="password" className="form-control" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="Min 6 characters" />
+                <div style={{ position: 'relative' }}>
+                  <input type={showNewPassword ? 'text' : 'password'} className="form-control" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="Min 6 characters" style={{ paddingRight: 42 }} />
+                  <button type="button" onClick={() => setShowNewPassword(v => !v)} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: '#9ca3af', padding: 0, lineHeight: 1 }} tabIndex={-1}>{showNewPassword ? EyeOffIcon : EyeIcon}</button>
+                </div>
               </div>
             </div>
             <div className="modal-footer">
@@ -427,6 +435,24 @@ export default function IAMPage() {
             </div>
           </div>
         </div>
+      )}
+      {saDeleteTarget && (
+        <ConfirmDialog
+          title="🗑 Remove System Access"
+          message={`Remove "${saDeleteTarget.system_name}" access for this role? Employees with this role will lose access.`}
+          confirmLabel="Yes, Remove"
+          cancelLabel="Cancel"
+          onConfirm={async () => {
+            try {
+              await iamAPI.deleteSystemAccess(saDeleteTarget.id);
+              toast.success('Access rule deleted');
+              loadSystemAccesses(filterRole);
+            } catch { toast.error('Failed to delete'); }
+            finally { setSaDeleteTarget(null); }
+          }}
+          onCancel={() => setSaDeleteTarget(null)}
+          variant="danger"
+        />
       )}
     </>
   );

@@ -4,6 +4,9 @@ import { authAPI, employeesAPI, onboardingAPI } from '../services/api';
 import { useButtonLoading } from '../hooks/useAsync';
 import LoadingButton from '../components/ui/LoadingButton';
 import { toast } from 'react-toastify';
+const EyeIcon = <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>;
+const EyeOffIcon = <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" /><line x1="1" y1="1" x2="23" y2="23" /></svg>;
+import { ConfirmDialog } from '../components/layout/Layout';
 
 function InfoRow({ label, value }) {
   return (
@@ -48,7 +51,7 @@ function DocViewer({ doc, employeeId }) {
     const token = localStorage.getItem('access_token');
     const ext = doc.document_name.split('.').pop().toLowerCase();
     setType(ext);
-    fetch(`https://intellative-hr-backend.onrender.com/api/v1/employees/${employeeId}/documents/${doc.id}/download`, {
+    fetch(`http://localhost:8000/api/v1/employees/${employeeId}/documents/${doc.id}/download`, {
       headers: { Authorization: `Bearer ${token}` },
     }).then(r => r.blob()).then(blob => setUrl(URL.createObjectURL(blob)));
   }, [doc.id, employeeId]);
@@ -141,10 +144,10 @@ function WorkHistoryTab({ employeeId, workHistory, onRefresh }) {
     } catch (err) { toast.error(err?.response?.data?.detail || 'Failed'); }
     finally { setSaving(false); }
   };
-  const handleDelete = async (whId) => {
-    if (!window.confirm('Remove this entry?')) return;
-    try { await onboardingAPI.deleteWorkHistory(whId); toast.success('Removed'); onRefresh(); }
-    catch (err) { toast.error(err?.response?.data?.detail || 'Failed'); }
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const handleDelete = async () => {
+    try { await onboardingAPI.deleteWorkHistory(deleteTarget); toast.success('Removed'); onRefresh(); setDeleteTarget(null); }
+    catch (err) { toast.error(err?.response?.data?.detail || 'Failed'); setDeleteTarget(null); }
   };
 
   const WHCard = ({ wh, canEdit }) => (
@@ -166,7 +169,7 @@ function WorkHistoryTab({ employeeId, workHistory, onRefresh }) {
       {canEdit && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <button className="btn btn-ghost btn-sm" onClick={() => openEdit(wh)}>✏️</button>
-          <button className="btn btn-ghost btn-sm" style={{ color: 'var(--danger)' }} onClick={() => handleDelete(wh.id)}>🗑</button>
+          <button className="btn btn-ghost btn-sm" style={{ color: 'var(--danger)' }} onClick={() => setDeleteTarget(wh.id)}>🗑</button>
         </div>
       )}
     </div>
@@ -218,6 +221,17 @@ function WorkHistoryTab({ employeeId, workHistory, onRefresh }) {
           {externalRecords.map(wh => <WHCard key={wh.id} wh={wh} canEdit={true} />)}
         </div>
       )}
+      {deleteTarget && (
+        <ConfirmDialog
+          title="🗑 Remove Entry"
+          message="Are you sure you want to remove this work history entry?"
+          confirmLabel="Yes, Remove"
+          cancelLabel="Cancel"
+          onConfirm={handleDelete}
+          onCancel={() => setDeleteTarget(null)}
+          variant="danger"
+        />
+      )}
       {workHistory.length === 0 && !showForm && (
         <div className="empty-state" style={{ padding: '60px 20px' }}>
           <div style={{ fontSize: 48 }}>📋</div>
@@ -236,10 +250,14 @@ export default function ProfilePage() {
   const [docs, setDocs] = useState([]);
   const [workHistory, setWorkHistory] = useState([]);
   const [insurance, setInsurance] = useState(null);
+  const [bank, setBank] = useState(null);
+  const [salary, setSalary] = useState(null);
   const [tab, setTab] = useState('personal');
   const [loading, setLoading] = useState(true);
   const [viewDoc, setViewDoc] = useState(null);
   const [pwForm, setPwForm] = useState({ old_password: '', new_password: '', confirm: '' });
+  const [showPw, setShowPw] = useState({ old: false, new: false, confirm: false });
+  const [showSalary, setShowSalary] = useState(false);
 
   const employeeId = user?.id;
 
@@ -251,11 +269,15 @@ export default function ProfilePage() {
       employeesAPI.listDocuments(employeeId),
       onboardingAPI.getWorkHistory(employeeId),
       onboardingAPI.getInsurance(employeeId).catch(() => ({ data: null })),
-    ]).then(([eRes, dRes, wRes, iRes]) => {
+      employeesAPI.getBankDetails(employeeId).catch(() => ({ data: null })),
+      employeesAPI.getSalaryDetails(employeeId).catch(() => ({ data: null })),
+    ]).then(([eRes, dRes, wRes, iRes, bRes, sRes]) => {
       setEmp(eRes.data);
       setDocs(dRes.data);
       setWorkHistory(Array.isArray(wRes.data) ? wRes.data : []);
       setInsurance(iRes.data || null);
+      setBank(bRes.data || null);
+      setSalary(sRes.data || null);
     }).catch(() => toast.error('Failed to load profile'))
       .finally(() => setLoading(false));
   };
@@ -274,7 +296,7 @@ export default function ProfilePage() {
 
   const downloadDoc = (doc) => {
     const token = localStorage.getItem('access_token');
-    fetch(`https://intellative-hr-backend.onrender.com/api/v1/employees/${employeeId}/documents/${doc.id}/download`, {
+    fetch(`http://localhost:8000/api/v1/employees/${employeeId}/documents/${doc.id}/download`, {
       headers: { Authorization: `Bearer ${token}` },
     }).then(r => r.blob()).then(blob => {
       const url = URL.createObjectURL(blob);
@@ -301,12 +323,14 @@ export default function ProfilePage() {
   const statusColors = { active: 'var(--success)', pending: 'var(--warning)', relieved: 'var(--danger)', inactive: 'var(--text-muted)' };
 
   const TABS = [
-    { key: 'personal',     label: '👤 Personal Info' },
-    { key: 'job',          label: '💼 Job Details' },
-    { key: 'documents',    label: `📄 Documents (${docs.length})` },
+    { key: 'personal', label: '👤 Personal Info' },
+    { key: 'job', label: '💼 Job Details' },
+    { key: 'salary', label: '💰 Compensation' },
+    { key: 'bank', label: '🏦 Bank & PAN' },
+    { key: 'documents', label: `📄 Documents (${docs.length})` },
     { key: 'work_history', label: `🏢 Work History (${workHistory.length})` },
-    { key: 'insurance',    label: '🏥 Insurance' },
-    { key: 'security',     label: '🔐 Security' },
+    { key: 'insurance', label: '🏥 Insurance' },
+    { key: 'security', label: '🔐 Security' },
   ];
 
   return (
@@ -359,27 +383,27 @@ export default function ProfilePage() {
 
       {/* TAB: Personal Info */}
       {tab === 'personal' && emp && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 20 }}>
           <div className="card">
             <div className="card-header" style={{ marginBottom: 16 }}><span className="card-title">👤 Personal Information</span></div>
             {[
-              ['First Name',     emp.first_name],
-              ['Last Name',      emp.last_name],
-              ['Company Email',  emp.email],
+              ['First Name', emp.first_name],
+              ['Last Name', emp.last_name],
+              ['Company Email', emp.email],
               ['Personal Email', emp.personal_email],
-              ['Phone',          emp.phone],
-              ['Gender',         emp.gender ? emp.gender.charAt(0).toUpperCase() + emp.gender.slice(1) : null],
-              ['Date of Birth',  emp.date_of_birth],
+              ['Phone', emp.phone ? emp.phone.replace(/^\+91/, '').replace(/^91(?=\d{10}$)/, '') : null],
+              ['Gender', emp.gender ? emp.gender.charAt(0).toUpperCase() + emp.gender.slice(1) : null],
+              ['Date of Birth', emp.date_of_birth],
             ].map(([l, v]) => <InfoRow key={l} label={l} value={v} />)}
           </div>
           <div className="card">
             <div className="card-header" style={{ marginBottom: 16 }}><span className="card-title">🏠 Address & Emergency Contact</span></div>
             {[
-              ['Address',         emp.address],
-              ['City',            emp.city],
-              ['State',           emp.state],
-              ['Pincode',         emp.pincode],
-              ['Emergency Name',  emp.emergency_contact_name],
+              ['Address', emp.address],
+              ['City', emp.city],
+              ['State', emp.state],
+              ['Pincode', emp.pincode],
+              ['Emergency Name', emp.emergency_contact_name],
               ['Emergency Phone', emp.emergency_contact_phone],
             ].map(([l, v]) => <InfoRow key={l} label={l} value={v} />)}
           </div>
@@ -388,16 +412,16 @@ export default function ProfilePage() {
 
       {/* TAB: Job Details */}
       {tab === 'job' && emp && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 20 }}>
           <div className="card">
             <div className="card-header" style={{ marginBottom: 16 }}><span className="card-title">💼 Employment Details</span></div>
             {[
-              ['Employee ID',    emp.employee_id],
-              ['Employee Type',  emp.employee_type ? emp.employee_type.charAt(0).toUpperCase() + emp.employee_type.slice(1) : null],
-              ['Status',         emp.status?.toUpperCase()],
-              ['Department',     emp.department?.name],
-              ['Role',           emp.role?.name],
-              ['Joining Date',   emp.joining_date],
+              ['Employee ID', emp.employee_id],
+              ['Employee Type', emp.employee_type ? emp.employee_type.charAt(0).toUpperCase() + emp.employee_type.slice(1) : null],
+              ['Status', emp.status?.toUpperCase()],
+              ['Department', emp.department?.name],
+              ['Role', emp.role?.name],
+              ['Joining Date', emp.joining_date],
               ['Relieving Date', emp.relieving_date],
             ].map(([l, v]) => <InfoRow key={l} label={l} value={v} />)}
           </div>
@@ -405,12 +429,118 @@ export default function ProfilePage() {
             <div className="card">
               <div className="card-header" style={{ marginBottom: 16 }}><span className="card-title">🔄 Rejoining Details</span></div>
               {[
-                ['Prev Employee ID',    emp.previous_employee_id],
-                ['Prev Joining Date',   emp.previous_joining_date],
+                ['Prev Employee ID', emp.previous_employee_id],
+                ['Prev Joining Date', emp.previous_joining_date],
                 ['Prev Relieving Date', emp.previous_relieving_date],
               ].map(([l, v]) => <InfoRow key={l} label={l} value={v} />)}
             </div>
           )}
+        </div>
+      )}
+      {/* TAB: Salary Details */}
+      {tab === 'salary' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: 20 }}>
+            <div className="card">
+              <div className="card-header" style={{ marginBottom: 16 }}>
+                <span className="card-title">🏢 Current Company — CTC</span>
+                <button className="btn btn-ghost btn-sm" onClick={() => setShowSalary(!showSalary)}>
+                  {showSalary ? EyeOffIcon : EyeIcon} {showSalary ? 'Hide' : 'Show'} Amounts
+                </button>
+              </div>
+              {!salary && (
+                <div style={{ padding: '8px 14px', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 8, marginBottom: 16, fontSize: 13, color: '#c2410c' }}>
+                  ⚠ Salary details not yet configured by HR.
+                </div>
+              )}
+              {[
+                ['Annual CTC', showSalary ? (salary?.ctc ? `₹${Number(salary.ctc).toLocaleString('en-IN')}` : '—') : '••••••'],
+                ['Monthly Basic', showSalary ? (salary?.basic ? `₹${Number(salary.basic).toLocaleString('en-IN')}` : '—') : '••••••'],
+                ['Monthly HRA', showSalary ? (salary?.hra ? `₹${Number(salary.hra).toLocaleString('en-IN')}` : '—') : '••••••'],
+                ['Special Allowance', showSalary ? (salary?.special_allowance ? `₹${Number(salary.special_allowance).toLocaleString('en-IN')}` : '—') : '••••••'],
+                ['PF Contribution', showSalary ? (salary?.pf_contribution ? `₹${Number(salary.pf_contribution).toLocaleString('en-IN')}` : '—') : '••••••'],
+                ['Monthly Bonus/Var', showSalary ? (salary?.bonus ? `₹${Number(salary.bonus).toLocaleString('en-IN')}` : '—') : '••••••'],
+              ].map(([l, v]) => <InfoRow key={l} label={l} value={v} />)}
+              <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 13, fontWeight: 700 }}>Est. Net In-Hand (Monthly)</span>
+                <span style={{ fontSize: 16, fontWeight: 800, color: 'var(--success)' }}>
+                  {showSalary ? (salary?.in_hand_salary ? `₹${Number(salary.in_hand_salary).toLocaleString('en-IN')}` : '—') : '••••••'}
+                </span>
+              </div>
+              {salary?.effective_date && (
+                <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text-muted)' }}>
+                  Effective from: {new Date(salary.effective_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                </div>
+              )}
+            </div>
+            <div className="card">
+              <div className="card-header" style={{ marginBottom: 16 }}><span className="card-title">ℹ️ Note</span></div>
+              <p style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                The breakdown shown here is based on your offer letter and internal HR rolls.
+                Actual take-home may vary slightly based on professional tax, income tax (TDS)
+                deductions according to your chosen tax regime, and other statutory deductions.
+              </p>
+            </div>
+          </div>
+          {/* Previous Company Salary History */}
+          {workHistory.filter(w => !w.is_intellativ && (w.salary || w.last_ctc)).length > 0 && (
+            <div className="card">
+              <div className="card-header" style={{ marginBottom: 16 }}><span className="card-title">📊 Previous Company Salary History</span></div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {workHistory.filter(w => !w.is_intellativ && (w.salary || w.last_ctc)).map((wh, i) => (
+                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: 'var(--bg)', borderRadius: 10, border: '1px solid var(--border-light)' }}>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: 14 }}>{wh.company_name}</div>
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                        {wh.designation || ''}{wh.designation && ' · '}
+                        {fmtDate(wh.start_date || wh.from_date)} — {wh.is_current ? 'Present' : fmtDate(wh.end_date || wh.to_date)}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--primary)' }}>
+                        {showSalary ? `₹${wh.salary || wh.last_ctc}` : '••••••'}
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Last CTC</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB: Bank Details */}
+      {tab === 'bank' && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: 20 }}>
+          <div className="card">
+            <div className="card-header" style={{ marginBottom: 16 }}><span className="card-title">🏦 Salary Bank Account</span></div>
+            {!bank && (
+              <div style={{ padding: '8px 14px', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 8, marginBottom: 16, fontSize: 13, color: '#c2410c' }}>
+                ⚠ Bank details not provided yet.
+              </div>
+            )}
+            {[
+              ['Bank Name', bank?.bank_name],
+              ['Account Holder', bank?.account_holder_name],
+              ['Account Number', bank?.account_number ? '••••' + bank.account_number.slice(-4) : '—'],
+              ['IFSC Code', bank?.ifsc_code],
+              ['Account Type', bank?.account_type ? bank.account_type.charAt(0).toUpperCase() + bank.account_type.slice(1) : null],
+              ['Branch', bank?.branch_name],
+            ].map(([l, v]) => <InfoRow key={l} label={l} value={v} />)}
+          </div>
+          <div className="card">
+            <div className="card-header" style={{ marginBottom: 16 }}><span className="card-title">🪪 Identity Numbers</span></div>
+            {[
+              ['PAN Number', emp?.pan_number],
+              ['UAN Number', emp?.uan_number],
+              ['PF Number', emp?.pf_number],
+            ].map(([l, v]) => <InfoRow key={l} label={l} value={v} />)}
+            <div style={{ marginTop: 20, padding: 12, background: 'var(--bg)', borderRadius: 8, border: '1px solid var(--border-light)', fontSize: 12, color: 'var(--text-muted)' }}>
+              🛡️ Account number and identity details are partially masked for security.
+              HR admins can view complete details for payroll processing.
+            </div>
+          </div>
         </div>
       )}
 
@@ -423,11 +553,11 @@ export default function ProfilePage() {
           </div>
           <p style={{ fontSize: 13, color: '#64748b', marginBottom: 20 }}>Max 10MB each • PDF, JPG, PNG, DOC accepted</p>
           <div style={{ marginBottom: 40 }}>
-            <DocumentSection title="🪪 Identity Documents" types={['aadhar','pan','passport_photo','voter_id','driving_license','passport']} docs={docs} uploadDoc={uploadDoc} onView={setViewDoc} labelMap={{ aadhar:'Aadhar Card', pan:'PAN Card', passport_photo:'Passport Size Photo', voter_id:'Voter ID', driving_license:'Driving License', passport:'Passport' }} />
-            <DocumentSection title="🏠 Address Proof (any one)" types={['utility_bill','rental_agreement','bank_statement_address']} docs={docs} uploadDoc={uploadDoc} onView={setViewDoc} labelMap={{ utility_bill:'Utility Bill', rental_agreement:'Rental Agreement', bank_statement_address:'Bank Statement (Address)' }} />
-            <DocumentSection title="🎓 Educational Documents" types={['marks_10th','marks_12th','graduation_certificate','postgraduation_certificate','consolidated_marks','degree']} docs={docs} uploadDoc={uploadDoc} onView={setViewDoc} labelMap={{ marks_10th:'10th Marks Sheet', marks_12th:'12th Marks Sheet', graduation_certificate:'Graduation Certificate', postgraduation_certificate:'Post-Graduation Certificate', consolidated_marks:'Consolidated Marks', degree:'Degree Certificate' }} />
-            <DocumentSection title="💼 Employment / Experience Documents" types={['relieving_letter','experience_certificate','experience_letter','payslips','form_16','pf_service_history','bank_statement_salary']} docs={docs} uploadDoc={uploadDoc} onView={setViewDoc} labelMap={{ relieving_letter:'Relieving Letter', experience_certificate:'Experience Certificate', experience_letter:'Experience Letter', payslips:'Last 3 Months Payslips', form_16:'Form 16 / ITR', pf_service_history:'PF Service History', bank_statement_salary:'Salary Bank Statement' }} />
-            <DocumentSection title="📎 Other Documents" types={['offer_letter','joining_letter','other']} docs={docs} uploadDoc={uploadDoc} onView={setViewDoc} labelMap={{ offer_letter:'Offer Letter', joining_letter:'Joining Letter', other:'Other Document' }} />
+            <DocumentSection title="🪪 Identity Documents" types={['aadhar', 'pan', 'passport_photo', 'voter_id', 'driving_license', 'passport']} docs={docs} uploadDoc={uploadDoc} onView={setViewDoc} labelMap={{ aadhar: 'Aadhar Card', pan: 'PAN Card', passport_photo: 'Passport Size Photo', voter_id: 'Voter ID', driving_license: 'Driving License', passport: 'Passport' }} />
+            <DocumentSection title="🏠 Address Proof (any one)" types={['utility_bill', 'rental_agreement', 'bank_statement_address']} docs={docs} uploadDoc={uploadDoc} onView={setViewDoc} labelMap={{ utility_bill: 'Utility Bill', rental_agreement: 'Rental Agreement', bank_statement_address: 'Bank Statement (Address)' }} />
+            <DocumentSection title="🎓 Educational Documents" types={['marks_10th', 'marks_12th', 'graduation_certificate', 'postgraduation_certificate', 'consolidated_marks', 'degree']} docs={docs} uploadDoc={uploadDoc} onView={setViewDoc} labelMap={{ marks_10th: '10th Marks Sheet', marks_12th: '12th Marks Sheet', graduation_certificate: 'Graduation Certificate', postgraduation_certificate: 'Post-Graduation Certificate', consolidated_marks: 'Consolidated Marks', degree: 'Degree Certificate' }} />
+            <DocumentSection title="💼 Employment / Experience Documents" types={['relieving_letter', 'experience_certificate', 'experience_letter', 'payslips', 'form_16', 'pf_service_history', 'bank_statement_salary']} docs={docs} uploadDoc={uploadDoc} onView={setViewDoc} labelMap={{ relieving_letter: 'Relieving Letter', experience_certificate: 'Experience Certificate', experience_letter: 'Experience Letter', payslips: 'Last 3 Months Payslips', form_16: 'Form 16 / ITR', pf_service_history: 'PF Service History', bank_statement_salary: 'Salary Bank Statement' }} />
+            <DocumentSection title="📎 Other Documents" types={['offer_letter', 'joining_letter', 'other']} docs={docs} uploadDoc={uploadDoc} onView={setViewDoc} labelMap={{ offer_letter: 'Offer Letter', joining_letter: 'Joining Letter', other: 'Other Document' }} />
           </div>
           {docs.length > 0 ? (
             <div>
@@ -473,7 +603,7 @@ export default function ProfilePage() {
 
       {/* TAB: Insurance */}
       {tab === 'insurance' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 20 }}>
           <div className="card">
             <div className="card-header" style={{ marginBottom: 16 }}><span className="card-title">🏥 Insurance Details</span></div>
             {insurance?.submitted && (
@@ -487,25 +617,25 @@ export default function ProfilePage() {
               </div>
             )}
             {[
-              ['Smoking Status',          insurance?.smoking_status],
-              ['Blood Group',             insurance?.blood_group],
+              ['Smoking Status', insurance?.smoking_status],
+              ['Blood Group', insurance?.blood_group],
               ['Pre-existing Conditions', insurance?.pre_existing_conditions],
             ].map(([l, v]) => <InfoRow key={l} label={l} value={v} />)}
           </div>
           <div className="card">
             <div className="card-header" style={{ marginBottom: 16 }}><span className="card-title">👤 Nominee Details</span></div>
             {[
-              ['Nominee Name',  insurance?.nominee_name],
-              ['Relation',      insurance?.nominee_relation],
-              ['Nominee DOB',   insurance?.nominee_dob],
+              ['Nominee Name', insurance?.nominee_name],
+              ['Relation', insurance?.nominee_relation],
+              ['Nominee DOB', insurance?.nominee_dob],
               ['Nominee Phone', insurance?.nominee_phone],
             ].map(([l, v]) => <InfoRow key={l} label={l} value={v} />)}
           </div>
           <div className="card">
             <div className="card-header" style={{ marginBottom: 16 }}><span className="card-title">💑 Spouse Details</span></div>
             {[
-              ['Spouse Name',   insurance?.spouse_name],
-              ['Spouse DOB',    insurance?.spouse_dob],
+              ['Spouse Name', insurance?.spouse_name],
+              ['Spouse DOB', insurance?.spouse_dob],
               ['Spouse Gender', insurance?.spouse_gender],
             ].map(([l, v]) => <InfoRow key={l} label={l} value={v} />)}
           </div>
@@ -529,15 +659,24 @@ export default function ProfilePage() {
           <form onSubmit={handleChangePassword}>
             <div className="form-group">
               <label className="form-label required">Current Password</label>
-              <input type="password" className="form-control" value={pwForm.old_password} onChange={e => setPwForm(f => ({ ...f, old_password: e.target.value }))} placeholder="Enter current password" required />
+              <div style={{ position: 'relative' }}>
+                <input type={showPw.old ? 'text' : 'password'} className="form-control" value={pwForm.old_password} onChange={e => setPwForm(f => ({ ...f, old_password: e.target.value }))} placeholder="Enter current password" required style={{ paddingRight: 42 }} />
+                <button type="button" onClick={() => setShowPw(s => ({ ...s, old: !s.old }))} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: '#9ca3af', padding: 0, lineHeight: 1 }} tabIndex={-1}>{showPw.old ? EyeOffIcon : EyeIcon}</button>
+              </div>
             </div>
             <div className="form-group">
               <label className="form-label required">New Password</label>
-              <input type="password" className="form-control" value={pwForm.new_password} onChange={e => setPwForm(f => ({ ...f, new_password: e.target.value }))} placeholder="Min 6 characters" required />
+              <div style={{ position: 'relative' }}>
+                <input type={showPw.new ? 'text' : 'password'} className="form-control" value={pwForm.new_password} onChange={e => setPwForm(f => ({ ...f, new_password: e.target.value }))} placeholder="Min 6 characters" required style={{ paddingRight: 42 }} />
+                <button type="button" onClick={() => setShowPw(s => ({ ...s, new: !s.new }))} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: '#9ca3af', padding: 0, lineHeight: 1 }} tabIndex={-1}>{showPw.new ? EyeOffIcon : EyeIcon}</button>
+              </div>
             </div>
             <div className="form-group">
               <label className="form-label required">Confirm New Password</label>
-              <input type="password" className="form-control" value={pwForm.confirm} onChange={e => setPwForm(f => ({ ...f, confirm: e.target.value }))} placeholder="Re-enter new password" required />
+              <div style={{ position: 'relative' }}>
+                <input type={showPw.confirm ? 'text' : 'password'} className="form-control" value={pwForm.confirm} onChange={e => setPwForm(f => ({ ...f, confirm: e.target.value }))} placeholder="Re-enter new password" required style={{ paddingRight: 42 }} />
+                <button type="button" onClick={() => setShowPw(s => ({ ...s, confirm: !s.confirm }))} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: '#9ca3af', padding: 0, lineHeight: 1 }} tabIndex={-1}>{showPw.confirm ? EyeOffIcon : EyeIcon}</button>
+              </div>
             </div>
             {pwForm.new_password && pwForm.confirm && pwForm.new_password !== pwForm.confirm && (
               <p className="form-error">Passwords do not match</p>

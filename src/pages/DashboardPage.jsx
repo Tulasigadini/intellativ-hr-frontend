@@ -5,7 +5,7 @@ import { dashboardAPI, employeesAPI } from '../services/api';
 import { toast } from 'react-toastify';
 
 export default function DashboardPage() {
-  const { can } = useAuth();
+  const { user, can } = useAuth();
   const [stats, setStats] = useState(null);
 
   // Redirect non-HR users away from dashboard
@@ -46,85 +46,79 @@ export default function DashboardPage() {
 
   return (
     <>
-      <div style={{ marginBottom: 24 }}>
-        <h1 className="page-title">Dashboard</h1>
-        <p className="page-subtitle">Overview of HR & workforce metrics</p>
+      <div className="dashboard-welcome-grid">
+        <div className="card welcome-card">
+          <div className="welcome-content">
+            <span className="badge badge-new" style={{ marginBottom: 12 }}>WELCOME</span>
+            <h1 className="welcome-title">Welcome back, {user?.first_name} {user?.last_name || ''}!</h1>
+            <p className="welcome-subtitle">Your workplace, your way.</p>
+          </div>
+          <div className="welcome-image">
+            <img src="/dashboard_illustration_3d_team_1776839349363.png" alt="Welcome team" />
+          </div>
+        </div>
       </div>
 
       {!stats ? (
         <div className="loading-overlay"><div className="spinner" /></div>
       ) : (
         <>
-          {/* Stat Cards */}
-          <div className="stat-grid">
-            {statCards.map((s) => (
-              <div className="stat-card" key={s.label}>
-                <div className={`stat-icon ${s.cls}`}>{s.icon}</div>
-                <div className="stat-info">
-                  <div className="stat-value">{s.value}</div>
-                  <div className="stat-label">{s.label}</div>
+          <div className="dashboard-main-grid-fixed">
+            <div className="dashboard-content-col">
+              {/* Stat Cards */}
+              <div className="stat-grid">
+                {statCards.map((s) => (
+                  <div className="stat-card" key={s.label}>
+                    <div className={`stat-icon ${s.cls}`}>{s.icon}</div>
+                    <div className="stat-info">
+                      <div className="stat-value">{s.value}</div>
+                      <div className="stat-label">{s.label}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Recent Employees */}
+              <div className="card">
+                <div className="card-header">
+                  <span className="card-title">Recent Employees</span>
+                  <button className="btn btn-outline btn-sm" onClick={() => navigate('/employees')}>
+                    View All
+                  </button>
+                </div>
+                <div className="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Employee</th>
+                        <th>ID</th>
+                        <th>Department</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {recentEmployees.map((emp) => (
+                        <tr key={emp.id}
+                          style={{ cursor: 'pointer' }}
+                          onClick={() => navigate(`/employees/${emp.id}`)}
+                        >
+                          <td>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                              <div className="avatar avatar-sm">
+                                {emp.first_name?.[0]}{emp.last_name?.[0]}
+                              </div>
+                              <div style={{ fontWeight: 600 }}>{emp.first_name} {emp.last_name}</div>
+                            </div>
+                          </td>
+                          <td><code style={{ fontSize: 12 }}>{emp.employee_id}</code></td>
+                          <td>{emp.department?.name || '—'}</td>
+                          <td>{statusBadge(emp.status)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
-            ))}
-          </div>
-
-          {/* Recent Employees */}
-          <div className="card">
-            <div className="card-header">
-              <span className="card-title">Recent Employees</span>
-              <button className="btn btn-outline btn-sm" onClick={() => navigate('/employees')}>
-                View All
-              </button>
-            </div>
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Employee</th>
-                    <th>ID</th>
-                    <th>Department</th>
-                    <th>Type</th>
-                    <th>Joining Date</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {recentEmployees.map((emp) => (
-                    <tr key={emp.id}
-                      style={{ cursor: 'pointer' }}
-                      onClick={() => navigate(`/employees/${emp.id}`)}
-                    >
-                      <td>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                          <div className="avatar avatar-sm">
-                            {emp.first_name[0]}{emp.last_name[0]}
-                          </div>
-                          <div>
-                            <div style={{ fontWeight: 600 }}>{emp.first_name} {emp.last_name}</div>
-                            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{emp.email}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td><code style={{ fontSize: 12 }}>{emp.employee_id}</code></td>
-                      <td>{emp.department?.name || '—'}</td>
-                      <td>
-                        <span className={`badge badge-${emp.employee_type}`}>
-                          {emp.employee_type}
-                        </span>
-                      </td>
-                      <td>{emp.joining_date || '—'}</td>
-                      <td>{statusBadge(emp.status)}</td>
-                    </tr>
-                  ))}
-                  {recentEmployees.length === 0 && (
-                    <tr><td colSpan={6}>
-                      <div className="empty-state" style={{ padding: '30px 20px' }}>
-                        <div>No employees yet</div>
-                      </div>
-                    </td></tr>
-                  )}
-                </tbody>
-              </table>
             </div>
           </div>
         </>

@@ -136,10 +136,6 @@ export default function Layout({ children }) {
             <div className="avatar" style={{ background: 'var(--primary-light)' }}>{initials}</div>
             <div className="user-info">
               <div className="user-name">{user?.first_name} {user?.last_name || ''}</div>
-              <div className="user-status">
-                <span className="status-dot"></span>
-                ACTIVE NOW
-              </div>
             </div>
             <button className="logout-mini-btn" onClick={(e) => { e.stopPropagation(); handleLogout(); }} title="Logout">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

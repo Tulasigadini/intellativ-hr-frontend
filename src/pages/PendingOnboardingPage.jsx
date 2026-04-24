@@ -336,6 +336,10 @@ export default function PendingOnboardingPage() {
       department_id: emp.department_id || '',
       role_id: emp.role_id || '',
       joining_date: emp.joining_date || '',
+      pan_number: emp.pan_number || '',
+      tan_number: emp.tan_number || '',
+      uan_number: emp.uan_number || '',
+      pf_number: emp.pf_number || '',
     });
 
     try { const { data } = await onboardingAPI.getWorkHistory(emp.id); setWorkHistory(data || []); } catch { }
@@ -460,6 +464,10 @@ export default function PendingOnboardingPage() {
         state: form.state || null, pincode: form.pincode || null,
         emergency_contact_name: form.emergency_contact_name || null,
         emergency_contact_phone: form.emergency_contact_phone || null,
+        pan_number: form.pan_number || null,
+        tan_number: form.tan_number || null,
+        uan_number: form.uan_number || null,
+        pf_number: form.pf_number || null,
       });
       toast.success('Personal info saved');
       setStep(1);
@@ -690,6 +698,18 @@ export default function PendingOnboardingPage() {
                 <div className="form-row">
                   <ValidatedInput label="Emergency Contact Name" value={form.emergency_contact_name} onChange={e => set('emergency_contact_name', e.target.value)} />
                   <ValidatedInput label="Emergency Contact Phone" value={form.emergency_contact_phone} error={errors.emergency_contact_phone} onChange={e => set('emergency_contact_phone', e.target.value.replace(/\D/g, ''))} maxLength={10} />
+                </div>
+
+                <div style={{ marginTop: 16, padding: 16, background: '#f8fafc', borderRadius: 10, border: '1px solid #e2e8f0', marginBottom: 16 }}>
+                  <p style={{ fontWeight: 600, fontSize: 14, marginBottom: 12, color: 'var(--primary)' }}>🪪 Identity & Statutory</p>
+                  <div className="form-row">
+                    <ValidatedInput label="PAN Number" value={form.pan_number} onChange={e => set('pan_number', e.target.value.toUpperCase())} placeholder="ABCDE1234F" maxLength={10} />
+                    <ValidatedInput label="TAN Number" value={form.tan_number} onChange={e => set('tan_number', e.target.value.toUpperCase())} placeholder="ABCD12345E" maxLength={10} />
+                  </div>
+                  <div className="form-row">
+                    <ValidatedInput label="UAN Number" value={form.uan_number} onChange={e => set('uan_number', e.target.value.replace(/\D/g, ''))} placeholder="12-digit UAN" maxLength={12} />
+                    <ValidatedInput label="PF Number" value={form.pf_number} onChange={e => set('pf_number', e.target.value)} placeholder="MH/BAN/..." />
+                  </div>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 24 }}>
                   <LoadingButton loading={submitting} loadingText="Saving…" onClick={savePersonalInfo}>Save & Next →</LoadingButton>

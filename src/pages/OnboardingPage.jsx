@@ -74,7 +74,7 @@ const BLANK_FORM = {
   emergency_contact_name: '', emergency_contact_phone: '',
   department_id: '', role_id: '', joining_date: '',
   previous_employee_id: '', previous_joining_date: '', previous_relieving_date: '',
-  pan_number: '', uan_number: '', pf_number: '',
+  pan_number: '', tan_number: '', uan_number: '', pf_number: '',
 };
 
 const BLANK_BANK = {
@@ -175,10 +175,10 @@ export default function OnboardingPage() {
     const validName = fn.length >= 2 && ln.length >= 2;
     const validEmail = em.includes('@') && em.split('@')[1]?.includes('.') && em.length >= 6;
     const validPhone = ph.length === 10;
-    if (!validName || (!validEmail && !validPhone)) { 
-      setExistingEmp(null); 
-      setHardBlock(false); 
-      return; 
+    if (!validName || (!validEmail && !validPhone)) {
+      setExistingEmp(null);
+      setHardBlock(false);
+      return;
     }
     setChecking(true);
     setHardBlock(false);
@@ -349,7 +349,36 @@ export default function OnboardingPage() {
       setWorkHistory(w => [...w, ...newRecords]);
     }
     if (acceptedData.salary) {
-      setSalary(s => ({ ...s, ...acceptedData.salary }));
+      // CTC details should not apply to current job details part, only to work history
+
+      const ctc = acceptedData.salary.ctc || acceptedData.salary.gross_salary || acceptedData.salary.annual_ctc;
+      const employer = acceptedData.salary.employer_name;
+      const fy = acceptedData.salary.financial_year;
+
+      if (ctc && employer) {
+        setWorkHistory(whList => {
+          const matchIndex = whList.findIndex(wh =>
+            wh.company_name?.toLowerCase().includes(employer.split(' ')[0].toLowerCase()) ||
+            (fy && wh.from_date && fy.includes(wh.from_date.split('-')[0])) ||
+            (fy && wh.to_date && fy.includes(wh.to_date.split('-')[0]))
+          );
+
+          if (matchIndex !== -1) {
+            const newList = [...whList];
+            newList[matchIndex] = { ...newList[matchIndex], last_ctc: ctc };
+            toast.success(`Mapped Form 16 CTC to Work History: ${newList[matchIndex].company_name}`);
+            return newList;
+          } else {
+            toast.success(`Added Form 16 as new Work History: ${employer}`);
+            return [...whList, {
+              company_name: employer, designation: '', department: '',
+              from_date: fy ? `${fy.split('-')[0]}-04-01` : '',
+              to_date: fy ? `20${fy.split('-')[1]}-03-31` : '',
+              is_current: false, reason_for_leaving: '', last_ctc: ctc
+            }];
+          }
+        });
+      }
     }
     if (acceptedData.bank) {
       setBank(b => ({ ...b, ...acceptedData.bank }));
@@ -367,7 +396,7 @@ export default function OnboardingPage() {
       await runSubmit(async () => {
         const payload = { ...form };
         const isRejoining = existingEmp && (existingEmp.status === 'relieved' || existingEmp.status === 'inactive');
-        
+
         if (isRejoining) {
           payload.employee_type = 'rejoining';
         }
@@ -562,11 +591,11 @@ export default function OnboardingPage() {
     if (!existingEmp) return null;
     const isRejoining = existingEmp.status === 'relieved' || existingEmp.status === 'inactive';
     return (
-      <div style={{ 
-        padding: 16, borderRadius: 12, 
-        border: `2px solid ${isRejoining ? '#f59e0b' : '#ef4444'}`, 
-        background: isRejoining ? 'var(--warning-bg)' : '#fef2f2', 
-        marginBottom: 20 
+      <div style={{
+        padding: 16, borderRadius: 12,
+        border: `2px solid ${isRejoining ? '#f59e0b' : '#ef4444'}`,
+        background: isRejoining ? 'var(--warning-bg)' : '#fef2f2',
+        marginBottom: 20
       }}>
         <p style={{ fontWeight: 700, fontSize: 14, marginBottom: 10, color: isRejoining ? '#b45309' : '#b91c1c' }}>
           {isRejoining ? '🔄 Rejoining Employee Found' : '❌ Active Employee Already Exists'}
@@ -593,6 +622,15 @@ export default function OnboardingPage() {
 
   return (
     <>
+      {/* Loading Overlay */}
+      {(resumeParsing || form16Parsing) && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(255,255,255,0.8)', zIndex: 9999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="spinner" style={{ width: 60, height: 60, marginBottom: 20 }} />
+          <h2 style={{ color: '#0369a1', margin: 0 }}>🤖 Extracting Data using AI...</h2>
+          <p style={{ color: '#64748b', marginTop: 10 }}>This may take a few seconds.</p>
+        </div>
+      )}
+
       {/* Step Progress */}
 
       <div style={{ marginBottom: 24 }}>
@@ -667,13 +705,17 @@ export default function OnboardingPage() {
                     <p style={{ margin: '0 0 10px', fontSize: 12, color: '#64748b' }}>Extracts name, phone, email, DOB, city, work history.</p>
                     <label style={{ display: 'block', padding: '9px 14px', background: resumeParsing ? '#9ca3af' : '#0369a1', color: 'white', borderRadius: 7, cursor: resumeParsing ? 'not-allowed' : 'pointer', fontSize: 12, fontWeight: 600, textAlign: 'center' }}>
                       {resumeParsing ? '🤖 Analysing Resume…' : '📁 Upload Resume'}
-                      <input type="file" style={{ display: 'none' }} accept=".pdf,.jpg,.jpeg,.png" disabled={resumeParsing}
+                      <input type="file" style={{ display: 'none' }} accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" disabled={resumeParsing}
                         onChange={async (e) => {
-                          const f = e.target.files?.[0]; if (!f) return;
+                          const files = Array.from(e.target.files);
+                          if (!files.length) return;
                           setResumeParsing(true);
                           try {
-                            const { data } = await employeesAPI.publicExtract(f, 'resume');
-                            setParsedData(data.data);
+                            const res = await employeesAPI.publicExtract(files, 'resume');
+                            if (res.data.is_fallback) {
+                              toast.warn("⚠️ AI is busy right now. Proceeded with general extraction process.");
+                            }
+                            setParsedData(res.data.data);
                             setShowParseReview(true);
                           } catch (err) {
                             toast.error('Extraction failed');
@@ -688,13 +730,22 @@ export default function OnboardingPage() {
                     <p style={{ margin: '0 0 10px', fontSize: 12, color: '#64748b' }}>Extracts name, PAN, income, allowances, PF, tax deducted.</p>
                     <label style={{ display: 'block', padding: '9px 14px', background: form16Parsing ? '#9ca3af' : '#0369a1', color: 'white', borderRadius: 7, cursor: form16Parsing ? 'not-allowed' : 'pointer', fontSize: 12, fontWeight: 600, textAlign: 'center' }}>
                       {form16Parsing ? '🤖 Analysing Form 16…' : '📁 Upload Form 16'}
-                      <input type="file" style={{ display: 'none' }} accept=".pdf,.jpg,.jpeg,.png" disabled={form16Parsing}
+                      <input type="file" style={{ display: 'none' }} accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" disabled={form16Parsing} multiple
                         onChange={async (e) => {
-                          const f = e.target.files?.[0]; if (!f) return;
+                          const files = Array.from(e.target.files);
+                          if (!files.length) return;
+                          if (files.length > 2) {
+                            toast.error('You can upload a maximum of 2 Form 16 files (e.g. Part A and Part B).');
+                            e.target.value = '';
+                            return;
+                          }
                           setForm16Parsing(true);
                           try {
-                            const { data } = await employeesAPI.publicExtract(f, 'form16');
-                            setParsedData(data.data);
+                            const res = await employeesAPI.publicExtract(files, 'form16');
+                            if (res.data.is_fallback) {
+                              toast.warn("⚠️ AI is busy right now. Proceeded with general extraction process.");
+                            }
+                            setParsedData(res.data.data);
                             setShowParseReview(true);
                           } catch (err) {
                             toast.error('Extraction failed');
@@ -731,6 +782,18 @@ export default function OnboardingPage() {
             <div className="form-row">
               <ValidatedInput label="Emergency Contact Name" value={form.emergency_contact_name} onChange={e => set('emergency_contact_name', e.target.value)} />
               <ValidatedInput label="Emergency Contact Phone" value={form.emergency_contact_phone} error={errors.emergency_contact_phone} onChange={e => set('emergency_contact_phone', e.target.value.replace(/\D/g, ''))} maxLength={10} />
+            </div>
+
+            <div style={{ marginTop: 16, padding: 16, background: '#f8fafc', borderRadius: 10, border: '1px solid #e2e8f0' }}>
+              <p style={{ fontWeight: 600, fontSize: 14, marginBottom: 12, color: 'var(--primary)' }}>🪪 Identity & Statutory</p>
+              <div className="form-row">
+                <ValidatedInput label="PAN Number" value={form.pan_number} onChange={e => set('pan_number', e.target.value.toUpperCase())} placeholder="ABCDE1234F" maxLength={10} />
+                <ValidatedInput label="TAN Number" value={form.tan_number} onChange={e => set('tan_number', e.target.value.toUpperCase())} placeholder="ABCD12345E" maxLength={10} />
+              </div>
+              <div className="form-row">
+                <ValidatedInput label="UAN Number" value={form.uan_number} onChange={e => set('uan_number', e.target.value.replace(/\D/g, ''))} placeholder="12-digit UAN" maxLength={12} />
+                <ValidatedInput label="PF Number" value={form.pf_number} onChange={e => set('pf_number', e.target.value)} placeholder="MH/BAN/..." />
+              </div>
             </div>
             {existingEmp && (existingEmp.status === 'relieved' || existingEmp.status === 'inactive') && (
               <div style={{ marginTop: 16, padding: 16, background: 'var(--accent-pale)', borderRadius: 10, border: '1px solid var(--accent)' }}>
@@ -859,13 +922,13 @@ export default function OnboardingPage() {
                   {cat.docs.map(dt => {
                     const isVerified = verifiedDocumentTypes.includes(dt.value);
                     const ex = pendingDocs.find(d => d.type === dt.value);
-                    
+
                     return (
-                      <label key={dt.value} style={{ 
-                        border: isVerified ? '2px solid #86efac' : `2px dashed ${ex ? 'var(--success)' : dt.required ? 'var(--accent)' : 'var(--border)'}`, 
-                        borderRadius: 10, padding: 14, cursor: isVerified ? 'default' : 'pointer', 
-                        background: isVerified ? '#f0fdf4' : ex ? 'var(--success-bg)' : 'var(--bg)', 
-                        display: 'flex', alignItems: 'center', gap: 12 
+                      <label key={dt.value} style={{
+                        border: isVerified ? '2px solid #86efac' : `2px dashed ${ex ? 'var(--success)' : dt.required ? 'var(--accent)' : 'var(--border)'}`,
+                        borderRadius: 10, padding: 14, cursor: isVerified ? 'default' : 'pointer',
+                        background: isVerified ? '#f0fdf4' : ex ? 'var(--success-bg)' : 'var(--bg)',
+                        display: 'flex', alignItems: 'center', gap: 12
                       }}>
                         {!isVerified && <input type="file" style={{ display: 'none' }} accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" onChange={e => { if (e.target.files[0]) addDoc(dt.value, e.target.files[0]); e.target.value = ''; }} />}
                         <span style={{ fontSize: 24 }}>{isVerified ? '🔒' : ex ? '✅' : dt.required ? '📌' : '📎'}</span>

@@ -23,7 +23,7 @@ function ParsedFieldReview({ parsed, source, onAccept, onClose }) {
     first_name: 'First Name', last_name: 'Last Name', phone: 'Phone',
     personal_email: 'Personal Email', date_of_birth: 'Date of Birth', gender: 'Gender',
     city: 'City', state: 'State', pincode: 'Pincode', address: 'Address',
-    employee_name: 'Employee Name (Form 16)', pan_number: 'PAN Number',
+    employee_name: 'Employee Name (Form 16)', pan_number: 'PAN Number', tan_number: 'TAN Number',
     uan_number: 'UAN Number', pf_number: 'PF Number', pf_account_number: 'PF Account Number',
     employer_name: 'Employer', financial_year: 'Financial Year', assessment_year: 'Assessment Year',
     gross_salary: 'Gross Salary', basic_salary: 'Basic Salary', hra: 'HRA',
@@ -455,32 +455,84 @@ export default function JoiningDetailsPage() {
 
   /* ── Handle parsed field acceptance (from modal) ───────────────── */
   const handleAcceptParsed = async (accepted, workHistoryRecords) => {
-    // For resume: nothing to "save" to profile — profile is view-only for employees.
-    // We only import work history records.
-    if (workHistoryRecords?.length) {
-      let added = 0;
-      for (const wh of workHistoryRecords) {
-        try {
-          await onboardingAPI.addWorkHistory(status.employee.id, {
-            company_name: wh.company_name || '', designation: wh.designation || '',
-            department: wh.department || '', from_date: wh.from_date || null,
-            to_date: wh.is_current ? null : (wh.to_date || null),
-            is_current: wh.is_current || false, last_ctc: wh.last_ctc || '', is_intellativ: false,
-          });
-          added++;
-        } catch { }
+    if (source === 'resume') {
+      if (workHistoryRecords?.length) {
+        let added = 0;
+        for (const wh of workHistoryRecords) {
+          try {
+            await onboardingAPI.addWorkHistory(status.employee.id, {
+              company_name: wh.company_name || '', designation: wh.designation || '',
+              department: wh.department || '', from_date: wh.from_date || null,
+              to_date: wh.is_current ? null : (wh.to_date || null),
+              is_current: wh.is_current || false, last_ctc: wh.last_ctc || '', is_intellativ: false,
+            });
+            added++;
+          } catch { }
+        }
+        if (added > 0) {
+          toast.success(`✅ Imported ${added} work history record(s)!`);
+          fetchWorkHistory(status.employee.id);
+        }
       }
-      if (added > 0) {
-        toast.success(`✅ Imported ${added} work history record(s)!`);
-        fetchWorkHistory(status.employee.id);
+    } else {
+      // Form 16 - Match CTC to Work History & Extract Bank Details
+      const fy = accepted.financial_year;
+      const ctc = accepted.annual_ctc || accepted.gross_salary;
+      const employer = accepted.employer_name;
+
+      if (ctc && employer) {
+        // Try to match the year or employer name with an existing work history
+        const matchedWH = workHistory.find(wh =>
+          wh.company_name?.toLowerCase().includes(employer.split(' ')[0].toLowerCase()) ||
+          (fy && wh.start_date && fy.includes(wh.start_date.split('-')[0])) ||
+          (fy && wh.end_date && fy.includes(wh.end_date.split('-')[0]))
+        );
+
+        if (matchedWH) {
+          try {
+            await onboardingAPI.updateWorkHistory(matchedWH.id, {
+              ...matchedWH,
+              last_ctc: ctc,
+              from_date: matchedWH.start_date,
+              to_date: matchedWH.end_date,
+            });
+            toast.success(`✅ Mapped Form 16 CTC (₹${ctc}) to Work History: ${matchedWH.company_name}`);
+            fetchWorkHistory(status.employee.id);
+          } catch { toast.error("Failed to update work history with Form 16 CTC"); }
+        } else {
+          try {
+            await onboardingAPI.addWorkHistory(status.employee.id, {
+              company_name: employer, designation: '', department: '',
+              from_date: fy ? `${fy.split('-')[0]}-04-01` : null,
+              to_date: fy ? `20${fy.split('-')[1]}-03-31` : null,
+              is_current: false, last_ctc: ctc, is_intellativ: false,
+            });
+            toast.success(`✅ Added Form 16 as new Work History: ${employer}`);
+            fetchWorkHistory(status.employee.id);
+          } catch { toast.error("Failed to add Form 16 as Work History"); }
+        }
+      }
+
+      // Save bank details if present
+      if (accepted.account_number && accepted.ifsc_code) {
+        try {
+          await employeesAPI.saveBankDetails(status.employee.id, {
+            ...bank,
+            account_number: accepted.account_number,
+            ifsc_code: accepted.ifsc_code,
+            bank_name: accepted.bank_name || bank.bank_name,
+            account_holder_name: accepted.account_holder_name || bank.account_holder_name,
+          });
+          toast.success("✅ Bank details saved from Form 16!");
+          fetchBank(status.employee.id);
+        } catch { toast.error("Failed to save Bank details"); }
       }
     }
-    // For Form 16: just informational — CTC fields are HR-managed, nothing to set on the profile.
-    // If any personal fields were extracted, notify employee they are view-only here.
-    const personalKeys = ['first_name', 'last_name', 'phone', 'personal_email', 'date_of_birth', 'gender', 'city', 'state', 'pincode'];
+
+    const personalKeys = ['first_name', 'last_name', 'phone', 'personal_email', 'date_of_birth', 'gender', 'city', 'state', 'pincode', 'pan_number', 'tan_number', 'uan_number', 'pf_number'];
     const hasPersonal = Object.keys(accepted).some(k => personalKeys.includes(k));
     if (hasPersonal) {
-      toast.info('ℹ️ Personal detail fields are view-only. Contact HR to update them.');
+      toast.info('ℹ️ Personal details are view-only here. Contact HR to update them.');
     }
     setShowParseReview(false);
     setParsedData(null);
@@ -514,6 +566,15 @@ export default function JoiningDetailsPage() {
   /* ── JSX ────────────────────────────────────────────────────────── */
   return (
     <div style={{ maxWidth: 960, margin: '0 auto', padding: '24px 16px' }}>
+
+      {/* Loading Overlay */}
+      {(resumeParsing || form16Parsing) && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(255,255,255,0.8)', zIndex: 9999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="spinner" style={{ width: 60, height: 60, marginBottom: 20 }} />
+          <h2 style={{ color: '#0369a1', margin: 0 }}>🤖 Extracting Data using AI...</h2>
+          <p style={{ color: '#64748b', marginTop: 10 }}>This may take a few seconds.</p>
+        </div>
+      )}
 
       {/* Parse review modal */}
       {showParseReview && parsedData && (
@@ -643,13 +704,17 @@ export default function JoiningDetailsPage() {
                   <p style={{ margin: '0 0 10px', fontSize: 12, color: '#64748b' }}>Extracts name, phone, email, DOB, city, work history.</p>
                   <label style={{ display: 'block', padding: '9px 14px', background: resumeParsing ? '#9ca3af' : '#0369a1', color: 'white', borderRadius: 7, cursor: resumeParsing ? 'not-allowed' : 'pointer', fontSize: 12, fontWeight: 600, textAlign: 'center' }}>
                     {resumeParsing ? '🤖 Analysing…' : '📁 Upload Resume'}
-                    <input type="file" style={{ display: 'none' }} accept=".pdf,.jpg,.jpeg,.png" disabled={resumeParsing}
+                    <input type="file" style={{ display: 'none' }} accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" disabled={resumeParsing}
                       onChange={async (e) => {
-                        const f = e.target.files?.[0]; if (!f) return;
+                        const files = Array.from(e.target.files);
+                        if (!files.length) return;
                         setResumeParsing(true);
                         try {
-                          const { data } = await employeesAPI.parseResume(status.employee.id, f);
-                          setParsedData({ parsed: data.parsed, source: 'resume' });
+                          const res = await employeesAPI.parseResume(status.employee.id, files);
+                          if (res.data.is_fallback) {
+                            toast.warn("⚠️ AI is busy right now. Proceeded with general extraction process.");
+                          }
+                          setParsedData({ parsed: res.data.data, source: 'resume' });
                           setShowParseReview(true);
                         } catch (err) { toast.error('Extraction failed'); }
                         finally { setResumeParsing(false); e.target.value = ''; }
@@ -661,14 +726,27 @@ export default function JoiningDetailsPage() {
                   <p style={{ margin: '0 0 10px', fontSize: 12, color: '#64748b' }}>Extracts PAN, UAN, CTC, TDS, PF, salary breakdown.</p>
                   <label style={{ display: 'block', padding: '9px 14px', background: form16Parsing ? '#9ca3af' : '#7c3aed', color: 'white', borderRadius: 7, cursor: form16Parsing ? 'not-allowed' : 'pointer', fontSize: 12, fontWeight: 600, textAlign: 'center' }}>
                     {form16Parsing ? '🤖 Analysing…' : '📁 Upload Form 16'}
-                    <input type="file" style={{ display: 'none' }} accept=".pdf,.jpg,.jpeg,.png" disabled={form16Parsing}
+                    <input type="file" style={{ display: 'none' }} accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" disabled={form16Parsing} multiple
                       onChange={async (e) => {
-                        const f = e.target.files?.[0]; if (!f) return;
+                        const files = Array.from(e.target.files);
+                        if (!files.length) return;
+                        if (files.length > 2) {
+                          toast.error('You can upload a maximum of 2 Form 16 files (e.g. Part A and Part B).');
+                          e.target.value = '';
+                          return;
+                        }
                         setForm16Parsing(true);
                         try {
-                          const { data } = await employeesAPI.parseForm16(status.employee.id, f);
-                          try { await employeesAPI.uploadDocument(status.employee.id, 'form_16', f); await fetchStatus(); } catch { }
-                          setParsedData({ parsed: data.parsed, source: 'form16' });
+                          const res = await employeesAPI.parseForm16(status.employee.id, files);
+                          if (res.data.is_fallback) {
+                            toast.warn("⚠️ AI is busy right now. Proceeded with general extraction process.");
+                          }
+                          try {
+                            // Upload at least the first one as document proof
+                            await employeesAPI.uploadDocument(status.employee.id, 'form_16', files[0]);
+                            await fetchStatus();
+                          } catch { }
+                          setParsedData({ parsed: res.data.data, source: 'form16' });
                           setShowParseReview(true);
                           toast.success('Form 16 uploaded! Review extracted details.');
                         } catch (err) { toast.error('Extraction failed'); }
@@ -703,9 +781,10 @@ export default function JoiningDetailsPage() {
             <Row label="Joining Date" value={emp.joining_date || '—'} />
             <Row label="Employee Type" value={emp.employee_type || '—'} />
           </InfoCard>
-          {(emp.pan_number || emp.uan_number || emp.pf_number) && (
+          {(emp.pan_number || emp.tan_number || emp.uan_number || emp.pf_number) && (
             <InfoCard title="Statutory / Identity Numbers" style={{ marginTop: 16 }}>
               {emp.pan_number && <Row label="PAN Number" value={emp.pan_number} />}
+              {emp.tan_number && <Row label="TAN Number" value={emp.tan_number} />}
               {emp.uan_number && <Row label="UAN Number" value={emp.uan_number} />}
               {emp.pf_number && <Row label="PF Number" value={emp.pf_number} />}
             </InfoCard>

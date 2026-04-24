@@ -667,6 +667,17 @@ export default function EmployeeDetailPage() {
               ['Emergency Phone', emp.emergency_contact_phone],
             ].map(([l, v]) => <InfoRow key={l} label={l} value={v} />)}
           </div>
+          <div className="card">
+            <div className="card-header" style={{ marginBottom: 16 }}>
+              <span className="card-title">🪪 Identity & Statutory</span>
+            </div>
+            {[
+              ['PAN Number', emp.pan_number],
+              ['TAN Number', emp.tan_number],
+              ['UAN Number', emp.uan_number],
+              ['PF Number', emp.pf_number],
+            ].map(([l, v]) => <InfoRow key={l} label={l} value={v} />)}
+          </div>
         </div>
       )}
 
@@ -1091,6 +1102,7 @@ export default function EmployeeDetailPage() {
             <div className="card-header" style={{ marginBottom: 16 }}><span className="card-title">🪪 Identity & Statutory</span></div>
             {[
               ['PAN Number', emp.pan_number],
+              ['TAN Number', emp.tan_number],
               ['UAN Number', emp.uan_number],
               ['PF Number', emp.pf_number],
             ].map(([l, v]) => <InfoRow key={l} label={l} value={v} />)}

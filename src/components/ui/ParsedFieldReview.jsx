@@ -22,7 +22,7 @@ export default function ParsedFieldReview({ data, currentData, onAccept, onClose
     first_name: 'First Name', last_name: 'Last Name', phone: 'Phone',
     personal_email: 'Personal Email', date_of_birth: 'Date of Birth', gender: 'Gender',
     city: 'City', state: 'State', pincode: 'Pincode', pan_number: 'PAN Number',
-    uan_number: 'UAN Number', pf_number: 'PF Number',
+    tan_number: 'TAN Number', uan_number: 'UAN Number', pf_number: 'PF Number',
     ctc: 'Annual CTC', basic: 'Basic Salary', hra: 'HRA', special_allowance: 'Special Allowance',
     pf_contribution: 'PF Contribution', gross_salary: 'Gross Salary', tds_deducted: 'TDS Deducted',
     net_taxable_income: 'Net Taxable Income', employer_name: 'Employer Name',

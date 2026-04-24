@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const API = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || 'https://intellativ-backend.duckdns.org/api/v1',
+  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:8000/api/v1',
   timeout: 30000,
 });
 
@@ -89,19 +89,31 @@ export const employeesAPI = {
   saveBankDetails: (id, data) => API.post(`/employees/${id}/bank-details`, data),
   verifyBankDetails: (id) => API.put(`/employees/${id}/bank-details/verify`),
   updateProfile: (id, data) => API.put(`/employees/${id}`, data),
-  parseResume: (id, file) => {
+  parseResume: (id, files) => {
     const fd = new FormData();
-    fd.append('file', file);
+    if (Array.isArray(files)) {
+      files.forEach(f => fd.append('files', f));
+    } else {
+      fd.append('files', files);
+    }
     return API.post(`/parsing/${id}/parse-resume`, fd, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 90000 });
   },
-  parseForm16: (id, file) => {
+  parseForm16: (id, files) => {
     const fd = new FormData();
-    fd.append('file', file);
+    if (Array.isArray(files)) {
+      files.forEach(f => fd.append('files', f));
+    } else {
+      fd.append('files', files);
+    }
     return API.post(`/parsing/${id}/parse-form16`, fd, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 90000 });
   },
-  publicExtract: (file, source = 'resume') => {
+  publicExtract: (files, source = 'resume') => {
     const fd = new FormData();
-    fd.append('file', file);
+    if (Array.isArray(files)) {
+      files.forEach(f => fd.append('files', f));
+    } else {
+      fd.append('files', files);
+    }
     fd.append('source', source);
     return API.post('/parsing/public/extract-data', fd, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 90000 });
   },

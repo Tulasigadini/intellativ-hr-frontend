@@ -533,6 +533,7 @@ export default function ProfilePage() {
             <div className="card-header" style={{ marginBottom: 16 }}><span className="card-title">🪪 Identity Numbers</span></div>
             {[
               ['PAN Number', emp?.pan_number],
+              ['TAN Number', emp?.tan_number],
               ['UAN Number', emp?.uan_number],
               ['PF Number', emp?.pf_number],
             ].map(([l, v]) => <InfoRow key={l} label={l} value={v} />)}

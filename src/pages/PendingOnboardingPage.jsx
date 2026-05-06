@@ -484,7 +484,14 @@ export default function PendingOnboardingPage() {
         joining_date: form.joining_date || null,
       });
       if (salary.ctc || salary.basic) {
-        await employeesAPI.saveSalaryDetails(selected.id, salary).catch(() => { });
+        const cleanedSalary = { ...salary };
+        Object.keys(cleanedSalary).forEach(k => { if (cleanedSalary[k] === '') cleanedSalary[k] = null; });
+        delete cleanedSalary.id;
+        delete cleanedSalary.employee_id;
+        delete cleanedSalary.created_at;
+        delete cleanedSalary.updated_at;
+        delete cleanedSalary.effective_date;
+        await employeesAPI.saveSalaryDetails(selected.id, cleanedSalary).catch(() => { });
       }
       toast.success('Job & Salary details saved');
       setStep(3);
@@ -506,7 +513,10 @@ export default function PendingOnboardingPage() {
   /* ── Work history ── */
   const addWH = async () => {
     if (!newWH.company_name || !newWH.from_date) { toast.error('Company name and start date are required'); return; }
-    await onboardingAPI.addWorkHistory(selected.id, newWH).catch(() => { });
+    const payload = { ...newWH };
+    if (payload.is_current) payload.to_date = null;
+    Object.keys(payload).forEach(k => { if (payload[k] === '') payload[k] = null; });
+    await onboardingAPI.addWorkHistory(selected.id, payload).catch(() => { });
     setWorkHistory(w => [...w, { ...newWH }]);
     setNewWH({ company_name: '', designation: '', from_date: '', to_date: '', is_current: false, reason_for_leaving: '', last_ctc: '' });
     setShowWHForm(false);
@@ -558,7 +568,14 @@ export default function PendingOnboardingPage() {
     await btnRun('activate', async () => {
       await employeesAPI.activate(selected.id);
       if (salary.ctc || salary.basic) {
-        await employeesAPI.saveSalaryDetails(selected.id, salary).catch(() => { });
+        const cleanedSalary = { ...salary };
+        Object.keys(cleanedSalary).forEach(k => { if (cleanedSalary[k] === '') cleanedSalary[k] = null; });
+        delete cleanedSalary.id;
+        delete cleanedSalary.employee_id;
+        delete cleanedSalary.created_at;
+        delete cleanedSalary.updated_at;
+        delete cleanedSalary.effective_date;
+        await employeesAPI.saveSalaryDetails(selected.id, cleanedSalary).catch(() => { });
       }
       await onboardingAPI.requestEmailSetup(selected.id).catch(() => { });
       try { await onboardingAPI.createActivationTasks(selected.id); } catch { }
@@ -726,7 +743,7 @@ export default function PendingOnboardingPage() {
                   <div key={i} style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 10, padding: '14px 16px', marginBottom: 10, display: 'flex', justifyContent: 'space-between' }}>
                     <div>
                       <div style={{ fontWeight: 700, fontSize: 15 }}>{wh.designation || 'Role'} @ {wh.company_name}</div>
-                      <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>{wh.from_date} → {wh.is_current ? 'Present' : (wh.to_date || '—')}</div>
+                      <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>{wh.from_date || wh.start_date} → {wh.is_current ? 'Present' : (wh.to_date || wh.end_date || '—')}</div>
                     </div>
                   </div>
                 ))}

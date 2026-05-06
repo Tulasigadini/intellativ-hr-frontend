@@ -381,6 +381,7 @@ export default function JoiningDetailsPage() {
     setWhSaving(true);
     try {
       const payload = { ...whForm, to_date: whForm.is_current ? null : (whForm.to_date || null), is_intellativ: false };
+      Object.keys(payload).forEach(k => { if (payload[k] === '') payload[k] = null; });
       if (editingWH) {
         await onboardingAPI.updateWorkHistory(editingWH.id, payload);
         toast.success('Work history updated!');
@@ -459,13 +460,20 @@ export default function JoiningDetailsPage() {
       if (workHistoryRecords?.length) {
         let added = 0;
         for (const wh of workHistoryRecords) {
+          if (!wh.company_name || !wh.from_date) continue;
+          let fromD = wh.from_date;
+          if (fromD && fromD.length === 7) fromD += '-01';
+          let toD = wh.to_date;
+          if (toD && toD.length === 7) toD += '-01';
           try {
-            await onboardingAPI.addWorkHistory(status.employee.id, {
-              company_name: wh.company_name || '', designation: wh.designation || '',
-              department: wh.department || '', from_date: wh.from_date || null,
-              to_date: wh.is_current ? null : (wh.to_date || null),
+            const payload = {
+              company_name: wh.company_name, designation: wh.designation || '',
+              department: wh.department || '', from_date: fromD,
+              to_date: wh.is_current ? null : (toD || null),
               is_current: wh.is_current || false, last_ctc: wh.last_ctc || '', is_intellativ: false,
-            });
+            };
+            Object.keys(payload).forEach(k => { if (payload[k] === '') payload[k] = null; });
+            await onboardingAPI.addWorkHistory(status.employee.id, payload);
             added++;
           } catch { }
         }
@@ -501,12 +509,14 @@ export default function JoiningDetailsPage() {
           } catch { toast.error("Failed to update work history with Form 16 CTC"); }
         } else {
           try {
-            await onboardingAPI.addWorkHistory(status.employee.id, {
+            const payload = {
               company_name: employer, designation: '', department: '',
               from_date: fy ? `${fy.split('-')[0]}-04-01` : null,
               to_date: fy ? `20${fy.split('-')[1]}-03-31` : null,
               is_current: false, last_ctc: ctc, is_intellativ: false,
-            });
+            };
+            Object.keys(payload).forEach(k => { if (payload[k] === '') payload[k] = null; });
+            await onboardingAPI.addWorkHistory(status.employee.id, payload);
             toast.success(`✅ Added Form 16 as new Work History: ${employer}`);
             fetchWorkHistory(status.employee.id);
           } catch { toast.error("Failed to add Form 16 as Work History"); }

@@ -95,6 +95,7 @@ function WorkHistoryTab({ employeeId, workHistory, canManage, currentUserId, onR
     try {
       const payload = { ...form };
       if (payload.is_current) payload.to_date = null;
+      Object.keys(payload).forEach(k => { if (payload[k] === '') payload[k] = null; });
       if (editingWH) {
         await onboardingAPI.updateWorkHistory(editingWH.id, payload);
         toast.success('Work history updated');
@@ -553,10 +554,16 @@ export default function EmployeeDetailPage() {
 
   const saveSalary = () => btnRun('salary', async () => {
     try {
-      await employeesAPI.saveSalaryDetails(id, salaryForm);
+      const cleanedSalary = { ...salaryForm };
+      Object.keys(cleanedSalary).forEach(k => { if (cleanedSalary[k] === '') cleanedSalary[k] = null; });
+      delete cleanedSalary.id;
+      delete cleanedSalary.employee_id;
+      delete cleanedSalary.created_at;
+      delete cleanedSalary.updated_at;
+      await employeesAPI.saveSalaryDetails(id, cleanedSalary);
       toast.success('Salary details updated');
       setEditingSalary(false); load();
-    } catch { toast.error('Failed to update salary'); }
+    } catch (err) { toast.error(err?.response?.data?.detail || 'Failed to update salary'); }
   });
 
   const saveBank = () => btnRun('bank', async () => {

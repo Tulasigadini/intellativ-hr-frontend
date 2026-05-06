@@ -428,7 +428,13 @@ export default function OnboardingPage() {
         };
 
         for (const wh of workHistory) {
-          const normFrom = normalizeDate(wh.from_date);
+          if (!wh.company_name || !wh.from_date) continue;
+          let fromD = wh.from_date;
+          if (fromD && fromD.length === 7) fromD += '-01';
+          let toD = wh.to_date;
+          if (toD && toD.length === 7) toD += '-01';
+
+          const normFrom = normalizeDate(fromD);
           const isDuplicate = existingWH.some(ex => {
             const exFrom = normalizeDate(ex.from_date || ex.start_date);
             return (
@@ -438,7 +444,10 @@ export default function OnboardingPage() {
             );
           });
           if (!isDuplicate) {
-            await onboardingAPI.addWorkHistory(empData.id, wh).catch(() => { });
+            const payload = { ...wh, from_date: fromD, to_date: toD };
+            if (payload.is_current) payload.to_date = null;
+            Object.keys(payload).forEach(k => { if (payload[k] === '') payload[k] = null; });
+            await onboardingAPI.addWorkHistory(empData.id, payload).catch(() => { });
           }
         }
 
